@@ -1,0 +1,773 @@
+####################################################################################
+###################netcdf2xlsx######################################################
+
+#################################################################################
+################ R-code to extract data from RCM and GCM models##################
+###################################################################################
+
+
+
+install.packages("openxlsx")
+install.packages("ncdf4")
+install.packages("raster")
+install.packages("sp")
+
+
+rm(list=ls()) # This is to clear all avariable
+
+
+dataext=function(direct,calender,coordexcel,parameter) {
+
+
+
+
+#####################################################################################################################
+################ This is the part for the gregorian year 365-366
+#####################################################################################################################
+
+library(openxlsx)
+library(ncdf4)
+library(raster)
+library(sp)
+
+
+months=1:12  #non-leap year
+
+Jan <- 31  
+Feb <- 28   
+Mar <- 31  
+Apr <- 30  
+May <- 31  
+Jun <- 30  
+Jul <- 31  
+Aug <- 31  
+Sep <- 30  
+Oct <- 31  
+Nov <- 30  
+Dec <- 31  
+
+months[1]=Jan # 31  
+months[2]=Feb # 28   
+months[3]=Mar # 31  
+months[4]=Apr # 30  
+months[5]=May # 31  
+months[6]=Jun # 30  
+months[7]=Jul # 31  
+months[8]=Aug # 31  
+months[9]=Sep # 30  
+months[10]=Oct # 31  
+months[11]=Nov # 30  
+months[12]=Dec # 31  
+
+reg_date=matrix(0,365,4) #matrix shows non-leap year
+
+count=0
+
+for ( i in 1:12) {  #loop for the month to sort
+reg_date[(count+1):(months[i]+count),2]=i
+
+count=sum(months[1:i])
+}
+
+
+count2=0
+
+for (i in 1:12) { #loop for days to sort
+reg_date[(count2+1):(months[i]+count2),3]=1:months[i]
+
+count2=sum(months[1:i])
+
+}
+
+
+count3=0
+
+for (i in 1:365) {
+
+if ( reg_date[i,2]==1) {
+
+reg_date[1:31,4]=reg_date[1:31,3]
+
+} else {
+
+reg_date[i,4]=reg_date[i,3]+sum(months[1:(reg_date[i,2]-1)])
+
+}
+
+
+}
+
+
+
+
+months_p=1:12  #leap year
+
+Jan <- 31  
+Feb <- 29   
+Mar <- 31  
+Apr <- 30  
+May <- 31  
+Jun <- 30  
+Jul <- 31  
+Aug <- 31  
+Sep <- 30  
+Oct <- 31  
+Nov <- 30  
+Dec <- 31  
+
+months_p[1]=Jan # 31  
+months_p[2]=Feb # 29   
+months_p[3]=Mar # 31  
+months_p[4]=Apr # 30  
+months_p[5]=May # 31  
+months_p[6]=Jun # 30  
+months_p[7]=Jul # 31  
+months_p[8]=Aug # 31  
+months_p[9]=Sep # 30  
+months_p[10]=Oct # 31  
+months_p[11]=Nov # 30  
+months_p[12]=Dec # 31  
+
+
+reg_date_p=matrix(0,366,4) #matrix shows leap year
+
+
+count_p=0
+
+for ( i in 1:12) {  #loop for months to sort
+reg_date_p[(count_p+1):(months_p[i]+count_p),2]=i
+
+count_p=sum(months_p[1:i])
+}
+
+
+count2_p=0
+
+for ( i in 1:12) {  #loop for months to sort
+reg_date_p[(count2_p+1):(months_p[i]+count2_p),3]=1:months_p[i]
+
+count2_p=sum(months_p[1:i])
+}
+
+
+for (i in 1:366) {
+
+if ( reg_date_p[i,2]==1) {
+
+reg_date_p[1:31,4]=reg_date_p[1:31,3]
+
+} else {
+
+reg_date_p[i,4]=reg_date_p[i,3]+sum(months_p[1:(reg_date_p[i,2]-1)])
+
+}
+
+
+}
+
+
+
+
+
+cum_years=1:200
+cum_years[1]=0
+cum_years[2]=365+1949/4-as.integer(1949/4) #it is adjusted based on the first year available in cordex data files
+
+if (1949/4-as.integer(1949/4)==0) {
+
+cum_years[2]=366
+
+}
+
+
+for ( i in 3:200) {
+
+cum_years[i]=cum_years[i-1]+365.25
+
+}
+
+cum_years=as.integer(cum_years)
+
+
+
+
+
+
+years=1949:2100 #years up to 2100
+
+
+comp_years=matrix(0,(366*length(years)),6)
+
+for (h in 1:(length(years))) { #loop for to obtain complete year matrix to compare with the temp data
+
+
+comp_years[(cum_years[h]+1):cum_years[h+1],3]=years[h]
+
+
+
+if ( ( (years[h]/4)%%1==0 )==TRUE) {  #2100 is not a leap year but it is divisible by 4. Thus, 2100 is externally adjusted
+
+comp_years[(cum_years[h]+1):cum_years[h+1],4:6]=reg_date_p[,2:4]
+
+
+} 
+
+
+
+
+
+if ( ((years[h]/4)%%1==0)==FALSE ) { 
+
+comp_years[(cum_years[h]+1):cum_years[h+1],4:6]=reg_date[,2:4]
+
+}
+
+
+
+comp_years[(cum_years[h]+1):cum_years[h+1],6]=comp_years[(cum_years[h]+1):cum_years[h+1],6]+cum_years[h]
+
+
+}
+
+ #The last day (Dec 31) of 2100 is subtracted from matrix so that the number of days on 2100 is decreased to 365
+exile=which(comp_years[,3]==2100 & comp_years[,4]==12 & comp_years[,5]==31)
+
+
+#The matrix is prepared as 6 column at first place because on previous research and it is decreased to 4
+comp_years=comp_years[1:(exile-1),3:6] 
+
+
+####non-leap year is added for 2100 instead of leap year(divisible by 4)
+comp_years[(nrow(comp_years)-364):nrow(comp_years),2:3]=reg_date[,2:3]
+
+
+
+ comp_years[,4]=comp_years[,4]-334.5
+
+
+yr365.25=comp_years
+
+#####################################################################################################################
+##########################This is the end of the gregorian year  ####################################################
+#####################################################################################################################
+
+
+
+#####################################################################################################################
+##########################This is the year that composed of 365 days ################################################
+#####################################################################################################################
+
+
+
+
+
+
+
+months=1:12  #non-leap year
+
+Jan <- 31  
+Feb <- 28   
+Mar <- 31  
+Apr <- 30  
+May <- 31  
+Jun <- 30  
+Jul <- 31  
+Aug <- 31  
+Sep <- 30  
+Oct <- 31  
+Nov <- 30  
+Dec <- 31  
+
+months[1]=Jan # 31  
+months[2]=Feb # 28   
+months[3]=Mar # 31  
+months[4]=Apr # 30  
+months[5]=May # 31  
+months[6]=Jun # 30  
+months[7]=Jul # 31  
+months[8]=Aug # 31  
+months[9]=Sep # 30  
+months[10]=Oct # 31  
+months[11]=Nov # 30  
+months[12]=Dec # 31  
+
+reg_date=matrix(0,365,4) #matrix shows non-leap year
+
+count=0
+
+for ( i in 1:12) {  #loop for months to sort
+reg_date[(count+1):(months[i]+count),2]=i
+
+count=sum(months[1:i])
+}
+
+
+count2=0
+
+for (i in 1:12) { #loop for days to sort
+reg_date[(count2+1):(months[i]+count2),3]=1:months[i]
+
+count2=sum(months[1:i])
+
+}
+
+
+count3=0
+
+for (i in 1:365) {
+
+if ( reg_date[i,2]==1) {
+
+reg_date[1:31,4]=reg_date[1:31,3]
+
+} else {
+
+reg_date[i,4]=reg_date[i,3]+sum(months[1:(reg_date[i,2]-1)])
+
+}
+
+
+}
+
+
+
+
+cum_years=1:200
+cum_years[1]=0
+cum_years[2]=365
+
+
+
+for ( i in 3:200) {
+
+cum_years[i]=cum_years[i-1]+365
+
+}
+
+
+
+
+
+
+years=1949:2100 #years up to 2100
+
+
+comp_years=matrix(0,(365*length(years)),6)
+
+for (h in 1:(length(years))) { #loop for to obtain complete year matrix to compare with the temp data
+
+
+comp_years[(cum_years[h]+1):cum_years[h+1],3]=years[h]
+
+
+
+
+comp_years[(cum_years[h]+1):cum_years[h+1],4:6]=reg_date[,2:4]
+
+
+
+comp_years[(cum_years[h]+1):cum_years[h+1],6]=comp_years[(cum_years[h]+1):cum_years[h+1],6]+cum_years[h]
+
+
+}
+
+
+#The matrix is prepared as 6 column at first place because on previous research and it is decreased to 4
+yr365=comp_years[,3:6] 
+
+
+yr365[,4]=yr365[,4]-334.5
+
+
+
+
+#####################################################################################################################
+##########################This is the end of the year that composed of 365 days #####################################
+#####################################################################################################################
+
+
+#####################################################################################################################
+##########################This is the year that composed of 360 days ################################################
+#####################################################################################################################
+
+
+months=1:12  #non-leap year
+
+Jan <- 30  
+Feb <- 30   
+Mar <- 30  
+Apr <- 30  
+May <- 30  
+Jun <- 30  
+Jul <- 30  
+Aug <- 30  
+Sep <- 30  
+Oct <- 30  
+Nov <- 30  
+Dec <- 30  
+
+months[1]=Jan # 31  
+months[2]=Feb # 28   
+months[3]=Mar # 31  
+months[4]=Apr # 30  
+months[5]=May # 31  
+months[6]=Jun # 30  
+months[7]=Jul # 31  
+months[8]=Aug # 31  
+months[9]=Sep # 30  
+months[10]=Oct # 31  
+months[11]=Nov # 30  
+months[12]=Dec # 31  
+
+reg_date=matrix(0,360,4) #matrix shows non-leap year
+
+count=0
+
+for ( i in 1:12) {  #loop for months to sort
+reg_date[(count+1):(months[i]+count),2]=i
+
+count=sum(months[1:i])
+}
+
+
+count2=0
+
+for (i in 1:12) { #loop for days to sort
+reg_date[(count2+1):(months[i]+count2),3]=1:months[i]
+
+count2=sum(months[1:i])
+
+}
+
+
+count3=0
+
+for (i in 1:360) {
+
+if ( reg_date[i,2]==1) {
+
+reg_date[1:30,4]=reg_date[1:30,3]
+
+} else {
+
+reg_date[i,4]=reg_date[i,3]+sum(months[1:(reg_date[i,2]-1)])
+
+}
+
+
+}
+
+
+
+
+cum_years=1:200
+cum_years[1]=0
+cum_years[2]=360
+
+
+
+for ( i in 3:200) {
+
+cum_years[i]=cum_years[i-1]+360
+
+}
+
+
+
+
+
+
+years=1949:2100 #years up tp 2100
+
+
+comp_years=matrix(0,(360*length(years)),6)
+
+for (h in 1:(length(years))) { #loop for to obtain complete year matrix to compare with the temp data
+
+
+comp_years[(cum_years[h]+1):cum_years[h+1],3]=years[h]
+
+
+
+
+comp_years[(cum_years[h]+1):cum_years[h+1],4:6]=reg_date[,2:4]
+
+
+
+comp_years[(cum_years[h]+1):cum_years[h+1],6]=comp_years[(cum_years[h]+1):cum_years[h+1],6]+cum_years[h]
+
+
+}
+
+#The matrix is prepared as 6 column at first place because on previous research and it is decreased to 4
+comp_years=comp_years[,3:6]
+
+
+comp_years[,4]=comp_years[,4]-330.5
+
+yr360=comp_years
+
+
+#####################################################################################################################
+##########################This is the end of the year that composed of 360 days #####################################
+#####################################################################################################################
+
+#####################################################################################################################
+##########################  This is the part the ncfiles are read  ##################################################
+#####################################################################################################################
+
+
+
+setwd(direct)
+
+
+
+files <- list.files(path=getwd(), pattern="*.nc", full.names=FALSE, recursive=FALSE) #this function lists the all the files with .nc extension in the corresponding directory
+
+
+crinf= read.xlsx(coordexcel) #coordinate info
+
+
+
+mydata=matrix(NA,((2100-1949)*400),nrow(crinf)+5) #+4 for year info, +1 for time from nc file
+
+
+
+
+colnames(mydata)=1:ncol(mydata)
+colnames(mydata)[5]="time(nc)"
+colnames(mydata)[1]="year"
+colnames(mydata)[2]="month"
+colnames(mydata)[3]="day"
+colnames(mydata)[4]="time(check with nc)"
+
+
+
+
+
+ if (calender ==365) {
+
+for ( y in 1:nrow(yr365)) {
+
+mydata[y,1:4]=yr365[y,]
+
+
+}
+
+ 
+
+}
+ if (calender ==360) {
+ 
+for ( y in 1:nrow(yr360)) {
+
+mydata[y,1:4]=yr360[y,]
+
+
+}
+
+
+}
+ if (calender ==365.25) {
+ 
+for ( y in 1:nrow(yr365.25)) {
+
+mydata[y,1:4]=yr365.25[y,]
+
+
+}
+
+}
+
+
+
+
+
+for (f in 1:length(files)) {
+
+
+ncfile=nc_open(files[f])
+
+attributes(ncfile$var)
+##This file needs to be 2 columned (1st column is for Latitude, 2nd column is for Longitude)  and with header
+
+
+lat=ncvar_get(ncfile,"lat")  #extract by parameter name
+
+lon=ncvar_get(ncfile,"lon")  #extract by parameter name
+
+rlat=ncvar_get(ncfile,"rlat")  #extract by parameter name
+
+rlon=ncvar_get(ncfile,"rlon")  #extract by parameter name
+
+
+time2=ncvar_get(ncfile,"time")  #extract by parameter name
+
+pr=ncvar_get(ncfile, parameter) #precipitation 
+
+crd=matrix(0,nrow(crinf),2) #This is to specify the indexes of the coordinates of the desired area
+
+for (c in 1:nrow(crinf)) {
+
+clat=abs(crinf[c,1]-lat) #for the closest latitude
+clon=abs(crinf[c,2]-lon) #for the closest longitude
+
+cll=clat+clon
+
+crd[c,1]=which(cll == min(cll), arr.ind = TRUE)[1] #the row index of the cth coordinate
+
+crd[c,2]=which(cll == min(cll), arr.ind = TRUE)[2] #the column index of the cth coordinate
+
+}
+
+
+
+
+
+mydata_wo_date=matrix(-500, length(time2),nrow(crd)) #data without date
+
+
+for (tm in 1:length(time2)) { #the loop for each day
+for (l in 1:nrow(crd)) { #the loop for each coordinate
+
+mydata_wo_date[tm,l]= pr[crd[l,1],crd[l,2],tm] 
+
+} 
+}
+
+
+
+
+
+mydata_w_nc_date=matrix(-20,nrow(mydata_wo_date),ncol(mydata_wo_date)+1)
+
+mydata_w_nc_date[,2:ncol(mydata_w_nc_date)]=mydata_wo_date
+mydata_w_nc_date[,1]=time2
+
+
+for (d in 1:nrow(mydata_w_nc_date)) {
+
+mydata[which(mydata[,4]==mydata_w_nc_date[d,1]),5:ncol(mydata)]=mydata_w_nc_date[d,]
+
+}
+
+
+
+
+
+
+}
+
+colnames(mydata_wo_date)=1:ncol(mydata_wo_date)
+
+for (l in 1:nrow(crd)) { #loop for columnnames
+
+colnames(mydata_wo_date)[l]=paste0("lat=",round(lat[crd[l,1],crd[l,2]],digit=3),", lon=",round(lon[crd[l,1],crd[l,2]],digit=3),", rlon=",round(rlon[crd[l,1]],digit=3),", rlat=",round(rlat[crd[l,2]],digit=3))
+
+} 
+
+colnames(mydata)[6:ncol(mydata)]=colnames(mydata_wo_date)
+
+
+findata=mydata[which(mydata[,6]!=1669217),]
+
+findata_stat=matrix(NA,7,ncol(findata)) #final data with statistical measures
+
+colnames(findata_stat)=colnames(findata)
+
+colnames(findata_stat)[1:5]=NA
+
+
+for ( s in 6:ncol(findata_stat)) { # loop for adding statistical measures 
+
+findata_stat[1,s]= mean(findata[,s])
+findata_stat[2,s]= sd(findata[,s])
+findata_stat[3,s]= quantile(findata[,s])[1]
+findata_stat[4,s]= quantile(findata[,s])[2]
+findata_stat[5,s]= quantile(findata[,s])[3]
+findata_stat[6,s]= quantile(findata[,s])[4]
+findata_stat[7,s]= quantile(findata[,s])[5]
+
+
+}
+
+findata_stat[1,1]="mean"
+findata_stat[2,1]="standart deviation"
+findata_stat[3,1]="quantile(0%)"
+findata_stat[4,1]="quantile(25%)"
+findata_stat[5,1]="quantile(50%)"
+findata_stat[6,1]="quantile(75%)"
+findata_stat[7,1]="quantile(100%)"
+
+
+cormat=matrix(0,nrow(crinf),nrow(crinf)) #the correlation matrix 
+
+colnames(cormat)=colnames(findata)[6:ncol(findata)]
+rownames(cormat)=colnames(findata)[6:ncol(findata)]
+
+
+
+
+
+for(r in 1:nrow(cormat)) {
+for(c in 1:ncol(cormat)) {
+
+cormat[r,c]=cor(findata[,(r+5)],findata[,(c+5)])
+
+}
+
+}
+
+list_of_datasets <- list("your_data" = findata , "statistical_measeures" = findata_stat, "correlation_bw_grids"=cormat)
+
+write.xlsx(findata,paste0(files[f],"_from_",min(findata[,1]),"_to_",max(findata[,1]),".xlsx"),rowNames=TRUE)
+
+
+return(paste("your file is ready"))
+
+}
+
+##############################################################################################################
+direct="E:/CORDEX/BiasAdjusted_Sep18/IPSL-CM5A-MR_WRF331F_RCP45/RCP45/day/pr"
+#this director should be the form of "C:/folder/folder/" which contains your netcdf files 
+#If you want one netcdf file to be extracted data from, put that file on this folder
+#If you want multiple netcdf file to be extracted data from, put all data on this folder
+#Make sure that all the files in the folder belongs to the same model
+##############################################################################################################
+
+
+##############################################################################################################
+parameter="prAdjust" #This is the parameter to be extracted
+##Write exactly the same name where you see on Panoply data viewer
+##############################################################################################################
+
+
+##############################################################################################################
+calender=365.25
+#for the years that consist of 360 days calender=360
+#for the years that consist of 365 days calender=365
+#for the years that consist of 365.25(gregorian, or standart) days calender=365.25
+##############################################################################################################
+
+
+##############################################################################################################
+coordexcel="E:/CORDEX/agu/lat_lon_info_try.xlsx" #This excel contains your coordinates
+##This file needs to be 2 columned (1st column is for Latitude, 2nd column is for Longitude)  and with header
+##############################################################################################################
+
+
+
+#If you get the error of "cannot allocate vector of size ... Gb"
+#run the command below or divide you coordinates into pieces and extract one by one
+memory.limit(size=10000000)
+
+
+dataext(direct,calender,coordexcel,parameter)
+
+
+
+
+
+#For further question, you can reach 118y365@gmail.com
+
+
